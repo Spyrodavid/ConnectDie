@@ -22,6 +22,11 @@ function get_block(x, y) {
 
 function set_block(x, y, block) {
     internal_grid[y][x] = block
+
+    if (block == undefined) {
+        return
+    }
+
     block.style.gridColumn = `${x + 1} / ${x + 1} `
     block.style.gridRow = `${y + 1} / ${y + 1}`
 }
@@ -79,6 +84,9 @@ for (y = 0; y < height; y ++) {
 }
 
 function try_swap(b1, b2) {
+
+    swap_time = .25
+
     b1.classList.remove("selected")
     b2.classList.remove("selected")
     selected = undefined
@@ -90,27 +98,46 @@ function try_swap(b1, b2) {
     var b2coord = get_coordinates(b2);
     b2x = b2coord[0]
     b2y = b2coord[1]
-
-    console.log(b1coord, b2coord)
         
 
     if ((Math.abs(b1x - b2x) <= 1) && (Math.abs(b1y - b2y) <= 1)) {
+
+        swap_blocks(b1x, b1y, b2x, b2y)
         
 
         if (check_matches()) {
-
             
 
-            remove_blocks()
-            add_blocks()
+            b1.style.transform = `translateY(${-(b2y - b1y) * 50}px) translateX(${-(b2x - b1x) * 50}px)`; // initial state
+            b2.style.transform = `translateY(${-(b1y - b2y) * 50}px) translateX(${-(b1x - b2x) * 50}px)`; // initial state
+
+
+            requestAnimationFrame(() => {
+                b1.style.transition = `transform ${swap_time}s ease`;
+                b1.style.transform = `translateY(0px) translateX(0px)`;
+
+                b2.style.transition = `transform ${swap_time}s ease`;
+                b2.style.transform = "translateY(0px) translateX(0px)";
+            });
+
+            setTimeout(() => {
+
+                b1.style.transition = "";
+                b1.style.transform = "";
+
+                b2.style.transition = "";
+                b2.style.transform = "";
+
+                remove_blocks()
+                add_blocks()
+                sift_blocks()
+            }, swap_time * 1000)
+
+            
         }
         else {  
-            temp = document.createElement("div")
-            grid.insertBefore(temp, b2)
-            grid.insertBefore(b2, b1)
-            grid.insertBefore(b1, temp)
+            swap_blocks(b1x, b1y, b2x, b2y)
 
-            temp.remove()
         }
 
     }
@@ -121,13 +148,22 @@ function check_matches() {
 
     matches_flag = false
 
+    function get_type(x, y) {
+        block = get_block(x, y)
+
+        if (block == undefined)
+            return NaN
+
+        return get_block(x, y).getAttribute("type")
+    }
+
 
     for (x = 0; x < width; x ++) {
         for (y = 0; y < height; y ++) {
 
             
-            if (x < width - 2 && get_block(x, y).getAttribute("type") == get_block(x + 1, y).getAttribute("type") &&
-                    get_block(x, y).getAttribute("type") == get_block(x + 2, y).getAttribute("type")) 
+            if (x < width - 2 && get_type(x, y) == get_type(x + 1, y) &&
+                    get_type(x, y) == get_type(x + 2, y)) 
               {
                 get_block(x, y).setAttribute("remove", "true");
                 get_block(x + 1, y).setAttribute("remove", "true");
@@ -141,8 +177,8 @@ function check_matches() {
             }
 
 
-            if (y < height - 2 && get_block(x, y).getAttribute("type") == get_block(x, y + 1).getAttribute("type") &&
-                    get_block(x, y).getAttribute("type") == get_block(x, y + 2).getAttribute("type")) 
+            if (y < height - 2 && get_type(x, y) == get_type(x, y + 1) &&
+                    get_type(x, y) == get_type(x, y + 2)) 
               {
 
 
@@ -168,7 +204,8 @@ function remove_blocks() {
     for (y = 0; y < height; y ++) {
         
         for (x = 0; x < width; x ++) {
-            console.log(get_block(x, y))
+            if (get_block(x, y) == undefined)
+                continue
 
             if (get_block(x, y).getAttribute("remove") == "true") {
                 delete_block(x, y)
@@ -185,3 +222,85 @@ function add_blocks() {
     //     }
     // }
 }
+
+function sift_blocks() {
+
+    for (i = 0; i < height; i ++) {
+
+        for (x = 0; x < width; x ++) {
+            
+            for (y = height - 1; y >= 0; y--) {
+
+                block = get_block(x, y)
+
+                if (block == undefined) continue
+                if (y == height - 1) continue
+
+                if ((get_block(x, y + 1) == undefined)) {
+                    swap_blocks(x, y, x, y + 1)
+
+                    if (block.getAttribute("fall") == null)
+                        block.setAttribute("fall", 1);
+                    else
+                        block.setAttribute("fall", Number(block.getAttribute("fall")) + 1)
+                }
+
+            }
+        }
+    }
+
+    for (x = 0; x < width; x ++) {
+    
+        for (y = height - 1; y >= 0; y--) {
+
+            block = get_block(x, y)
+
+            if (block == undefined) continue
+
+            fall_height = block.getAttribute("fall")
+
+            block.style.transform += `translateY(${-50 * fall_height}px) `;
+
+        }
+    }
+    
+
+    
+
+    requestAnimationFrame(() => {
+
+        for (x = 0; x < width; x ++) {
+    
+            for (y = height - 1; y >= 0; y--) {
+
+                block = get_block(x, y)
+
+                if (block == undefined) continue
+
+                fall_height = block.getAttribute("fall")
+
+                block.style.transition = `transform ${fall_height}s cubic-bezier(0.7, 0, 0.84, 0)`;
+                block.style.transform = "translateY(0px) translateX(0px)"
+
+                block.setAttribute("fall", 0);
+
+            }
+        }
+
+    });
+
+}
+
+// function loop() {
+//     check_matches()
+//     remove_blocks()
+//     add_blocks()
+//     sift_blocks()
+
+//     setTimeout(() => {
+//         loop()   
+//     }, 1000)
+// }
+
+// loop()
+
