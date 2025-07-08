@@ -7,7 +7,7 @@ body {
     place-items: center;
 
     background-color: rgb(67, 67, 67);
-    background-image: linear-gradient(rgb(118, 118, 118) 0px, rgb(84, 0, 0) 100vh);
+    background-image: linear-gradient(rgb(48, 48, 48) 0px, black 100vh);
 }
 
 #grid {
@@ -15,7 +15,7 @@ body {
 
 }
 
-.blood, .guts, .brain, .eyes{
+.block {
     margin: 2px;
     border-radius: 10px;
 }
@@ -24,7 +24,6 @@ body {
     border: 2px;
     border-style: dotted;
 }
-
 
 #brain {
     position: absolute;
@@ -58,6 +57,6 @@ body {
 }
 
 .remove {
-    background-color: black;
+    opacity: 50% !important;
 }
 
