@@ -56,7 +56,6 @@ body {
     background-color: rgb(199, 0, 96);
 }
 
-/* .remove {
-    opacity: 50% !important;
-} */
-
+.remove {
+    opacity: 50%;
+}

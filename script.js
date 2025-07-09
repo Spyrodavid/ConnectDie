@@ -1,6 +1,8 @@
 width = 8
 height = 8
 
+danger = .5
+
 grid = document.getElementById("grid")
 
 grid.style.gridTemplateRows = `repeat(${height}, 50px)`
@@ -57,28 +59,43 @@ function delete_block(x, y) {
 
 }
 
+function block_factory() {
+
+    block = document.createElement('div')
+    random_type = block_types[Math.floor(Math.random() * block_types.length)]
+    block.setAttribute("type", random_type)
+    block.classList.add(random_type)
+    block.classList.add("block")
+
+    block.addEventListener('click', (e) => {
+        e.currentTarget.classList.add("selected");
+        if (selected == undefined)
+            selected = e.currentTarget
+        else {
+            try_swap(selected, e.currentTarget)
+            finish_iteration()
+        }
+    })
+
+    // block.addEventListener('transitionend', (e) => {
+
+    //     e.target.style.transition = ``;
+    //     e.target.style.transform = ``;
+
+    // })
+
+    return block
+}
+
 
 for (y = 0; y < height; y ++) {
     
     for (x = 0; x < width; x ++) {
         
-        block = document.createElement('div')
-        random_type = block_types[Math.floor(Math.random() * block_types.length)]
-        block.setAttribute("type", random_type)
-        block.classList.add(random_type)
-        block.classList.add("block")
+        block = block_factory()
         
         set_block(x, y, block)
         grid.appendChild(block) 
-
-        block.addEventListener('click', (e) => {
-            e.currentTarget.classList.add("selected");
-            if (selected == undefined)
-                selected = e.currentTarget
-            else {
-                try_swap(selected, e.currentTarget)
-            }
-        })
 
     }
 }
@@ -106,18 +123,21 @@ function try_swap(b1, b2) {
         
 
         if (check_matches()) {
-            
-
             b1.style.transform = `translateY(${-(b2y - b1y) * 50}px) translateX(${-(b2x - b1x) * 50}px)`; // initial state
             b2.style.transform = `translateY(${-(b1y - b2y) * 50}px) translateX(${-(b1x - b2x) * 50}px)`; // initial state
+            
+            // Force layout reflow
+            void b1.offsetHeight;
 
 
             requestAnimationFrame(() => {
+                
                 b1.style.transition = `transform ${swap_time}s ease`;
-                b1.style.transform = `translateY(0px) translateX(0px)`;
 
                 b2.style.transition = `transform ${swap_time}s ease`;
                 b2.style.transform = "translateY(0px) translateX(0px)";
+            b1.style.transform = `translateY(0px) translateX(0px)`;
+
             });
 
             setTimeout(() => {
@@ -128,9 +148,6 @@ function try_swap(b1, b2) {
                 b2.style.transition = "";
                 b2.style.transform = "";
 
-                remove_blocks()
-                add_blocks()
-                sift_blocks()
             }, swap_time * 1000)
 
             
@@ -214,15 +231,6 @@ function remove_blocks() {
     }
 }
 
-function add_blocks() {
-    // for (block of grid.children) {
-    //     console.log(block)
-    //     if (block.getAttribute("remove") == "true") {
-    //         block.remove()
-    //     }
-    // }
-}
-
 function sift_blocks() {
 
     for (i = 0; i < height; i ++) {
@@ -248,6 +256,29 @@ function sift_blocks() {
             }
         }
     }
+}
+
+function add_blocks_top() {
+
+    for (x = 0; x < width; x ++) {
+            
+        for (y = 0; y < height; y++) {
+
+            block = get_block(x, y)
+
+            if (block != undefined) continue
+
+            set_block(x, y, block_factory())
+            block.setAttribute("fall", height)
+
+            grid.appendChild(block) 
+
+        }
+    }
+
+}
+
+function animate_block_fall() {
 
     for (x = 0; x < width; x ++) {
     
@@ -262,12 +293,9 @@ function sift_blocks() {
             block.style.transform += `translateY(${-50 * fall_height}px) `;
 
         }
-    }
-    
+    }    
 
-    
-
-    requestAnimationFrame(() => {
+    setTimeout(() => {
 
         for (x = 0; x < width; x ++) {
     
@@ -279,28 +307,48 @@ function sift_blocks() {
 
                 fall_height = block.getAttribute("fall")
 
-                block.style.transition = `transform ${fall_height}s cubic-bezier(0.7, 0, 0.84, 0)`;
+                block.style.transition = `transform ${1}s cubic-bezier(0.7, 0, 0.84, .5)`;
                 block.style.transform = "translateY(0px) translateX(0px)"
 
-                block.setAttribute("fall", 0);
+                block.removeAttribute("fall");
 
             }
         }
 
-    });
-
+    }, 100);
 }
 
-// function loop() {
-//     check_matches()
-//     remove_blocks()
-//     add_blocks()
-//     sift_blocks()
+function iteration() {
+    check_matches()
+    remove_blocks()
+    sift_blocks()
+    add_blocks_top()
+    animate_block_fall()
+}
 
-//     setTimeout(() => {
-//         loop()   
-//     }, 1000)
-// }
+function finish_iteration() {
+    remove_blocks()
+    sift_blocks()
+    add_blocks_top()
+    animate_block_fall()
 
-// loop()
+    setTimeout(() => {
+        if (check_matches())
+            finish_iteration()
+    }, 1000)
+    
+}
 
+
+
+function updates() {
+    document.documentElement.style.setProperty("--danger", danger)
+
+    setTimeout(() => {
+        updates()  
+    }, 10)
+}
+
+function reflow(elt){
+    console.log(elt.offsetHeight);
+}
