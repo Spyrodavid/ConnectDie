@@ -73,16 +73,8 @@ function block_factory() {
             selected = e.currentTarget
         else {
             try_swap(selected, e.currentTarget)
-            finish_iteration()
         }
     })
-
-    // block.addEventListener('transitionend', (e) => {
-
-    //     e.target.style.transition = ``;
-    //     e.target.style.transform = ``;
-
-    // })
 
     return block
 }
@@ -101,8 +93,6 @@ for (y = 0; y < height; y ++) {
 }
 
 function try_swap(b1, b2) {
-
-    swap_time = .25
 
     b1.classList.remove("selected")
     b2.classList.remove("selected")
@@ -123,32 +113,14 @@ function try_swap(b1, b2) {
         
 
         if (check_matches()) {
-            b1.style.transform = `translateY(${-(b2y - b1y) * 50}px) translateX(${-(b2x - b1x) * 50}px)`; // initial state
-            b2.style.transform = `translateY(${-(b1y - b2y) * 50}px) translateX(${-(b1x - b2x) * 50}px)`; // initial state
-            
-            // Force layout reflow
-            void b1.offsetHeight;
+            start_animation = true
+            b1.setAttribute("animation", `translateY(calc((1 - tX) * ${-(b2y - b1y) * 50}px)) translateX(calc((1 - tX) * ${-(b2x - b1x) * 50}px))`)
+            b2.setAttribute("animation", `translateY(calc((1 - tX) * ${-(b1y - b2y) * 50}px)) translateX(calc((1 - tX) * ${-(b1x - b2x) * 50}px))`)
 
-
-            requestAnimationFrame(() => {
-                
-                b1.style.transition = `transform ${swap_time}s ease`;
-
-                b2.style.transition = `transform ${swap_time}s ease`;
-                b2.style.transform = "translateY(0px) translateX(0px)";
-            b1.style.transform = `translateY(0px) translateX(0px)`;
-
-            });
 
             setTimeout(() => {
-
-                b1.style.transition = "";
-                b1.style.transform = "";
-
-                b2.style.transition = "";
-                b2.style.transform = "";
-
-            }, swap_time * 1000)
+                next_state()
+            }, 1000)
 
             
         }
@@ -229,6 +201,8 @@ function remove_blocks() {
             }
         }
     }
+
+    next_state()
 }
 
 function sift_blocks() {
@@ -256,6 +230,8 @@ function sift_blocks() {
             }
         }
     }
+
+    next_state()
 }
 
 function add_blocks_top() {
@@ -276,6 +252,8 @@ function add_blocks_top() {
         }
     }
 
+    next_state()
+
 }
 
 function animate_block_fall() {
@@ -289,33 +267,14 @@ function animate_block_fall() {
             if (block == undefined) continue
 
             fall_height = block.getAttribute("fall")
+            block.removeAttribute("fall")
 
-            block.style.transform += `translateY(${-50 * fall_height}px) `;
+            block.setAttribute("animation", `translateY(calc((1 - tX) * ${-50 * fall_height}px))`)
 
         }
-    }    
-
-    setTimeout(() => {
-
-        for (x = 0; x < width; x ++) {
+    }   
     
-            for (y = height - 1; y >= 0; y--) {
-
-                block = get_block(x, y)
-
-                if (block == undefined) continue
-
-                fall_height = block.getAttribute("fall")
-
-                block.style.transition = `transform ${1}s cubic-bezier(0.7, 0, 0.84, .5)`;
-                block.style.transform = "translateY(0px) translateX(0px)"
-
-                block.removeAttribute("fall");
-
-            }
-        }
-
-    }, 100);
+    setTimeout(() => {next_state()}, 1000)
 }
 
 function iteration() {
@@ -339,16 +298,98 @@ function finish_iteration() {
     
 }
 
-
-
-function updates() {
-    document.documentElement.style.setProperty("--danger", danger)
-
-    setTimeout(() => {
-        updates()  
-    }, 10)
+state_transition = {
+    idle : "remove_blocks",
+    remove_blocks : "sift_blocks",
+    sift_blocks : "add_blocks_top",
+    add_blocks_top : "animate_block_fall",
+    animate_block_fall: "idle",
 }
 
-function reflow(elt){
-    console.log(elt.offsetHeight);
+state_name_to_function = {
+    "check_matches" : check_matches,
+    "remove_blocks" : remove_blocks,
+    "sift_blocks" : sift_blocks,
+    "add_blocks_top" : add_blocks_top,
+    "animate_block_fall": animate_block_fall,
+    "idle" : () => {}
+}
+
+current_state = "idle"
+
+start_animation = true
+
+// Animation
+setInterval(() => {
+    if (start_animation) {
+        start_time = Date.now() / 1000
+        start_animation = false
+    }
+
+    time_elapsed = (Date.now() / 1000) - start_time
+
+    length_t = 1
+
+    t = time_elapsed / length_t
+    if (t > 1)
+        t = 1
+    
+
+    update_animation(t)
+    
+}, 10)
+
+function update_animation(t) {
+    for (x = 0; x < width; x ++) {
+                
+            for (y = 0; y < height; y++) {
+
+                block = get_block(x, y)
+                if (block == undefined || block.getAttribute("animation") == undefined)
+                    continue
+
+                animation = block.getAttribute("animation")
+
+                block.style.transform = animation.replaceAll("tX", easeInSine(t))
+            }
+        }
+}
+
+
+function next_state() {
+
+    for (x = 0; x < width; x ++) {
+            
+        for (y = 0; y < height; y++) {
+
+            block = get_block(x, y)
+
+            if (block != undefined)
+                block.removeAttribute("animation")
+
+        }
+    }
+
+    console.log(current_state)
+    
+
+    if (current_state == "idle" && check_matches()) {
+        console.log('WOW')
+        current_state = "remove_blocks"
+        state_name_to_function[current_state]()
+        start_animation = true
+    } else if (current_state != "idle") {
+        console.log("wow")
+        console.log(`${current_state} -> ${state_transition[current_state]}`)
+        current_state = state_transition[current_state]
+        state_name_to_function[current_state]()
+    }
+
+    update_animation(0)
+
+    
+}
+
+function easeInSine(x) {
+  return 1 - Math.cos((x * Math.PI) / 2);
 }
