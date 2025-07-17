@@ -1,7 +1,10 @@
 width = 8
 height = 8
 
-danger = .5
+knife_acceleration = 0
+knife_position = 0
+knife_velocity = 0
+score = 0
 
 grid = document.getElementById("grid")
 
@@ -9,6 +12,15 @@ grid.style.gridTemplateRows = `repeat(${height}, 50px)`
 grid.style.gridTemplateColumns = `repeat(${width}, 50px)`
 
 block_types = ["blood", "guts", "brain", "eyes"]
+
+level_index = 0
+levels = [
+    {color : "rgb(60, 60, 60)", acceleration : .001},
+    {color : "rgb(30, 120, 30)", acceleration : .002},
+    {color : "rgb(130, 30, 30)", acceleration : .003}
+]
+
+level_change = [100, 200, 400]
 
 let selected = undefined
 
@@ -68,6 +80,11 @@ function block_factory() {
     block.classList.add("block")
 
     block.addEventListener('click', (e) => {
+
+        if (current_state != "idle") {
+            return
+        }
+
         e.currentTarget.classList.add("selected");
         if (selected == undefined)
             selected = e.currentTarget
@@ -106,23 +123,16 @@ function try_swap(b1, b2) {
     b2x = b2coord[0]
     b2y = b2coord[1]
         
-
-    if ((Math.abs(b1x - b2x) <= 1) && (Math.abs(b1y - b2y) <= 1)) {
+    if ((Math.abs(b1x - b2x) <= 1 && b1y == b2y) || (Math.abs(b1y - b2y) <= 1 && b1x == b2x)) {
 
         swap_blocks(b1x, b1y, b2x, b2y)
         
 
         if (check_matches()) {
-            start_animation = true
             b1.setAttribute("animation", `translateY(calc((1 - tX) * ${-(b2y - b1y) * 50}px)) translateX(calc((1 - tX) * ${-(b2x - b1x) * 50}px))`)
             b2.setAttribute("animation", `translateY(calc((1 - tX) * ${-(b1y - b2y) * 50}px)) translateX(calc((1 - tX) * ${-(b1x - b2x) * 50}px))`)
 
-
-            setTimeout(() => {
-                next_state()
-            }, 1000)
-
-            
+            next_state("swap")
         }
         else {  
             swap_blocks(b1x, b1y, b2x, b2y)
@@ -163,6 +173,8 @@ function check_matches() {
                 get_block(x + 2, y).classList.add("remove")
 
                 matches_flag = true
+
+                add_to_score_stack()
             }
 
 
@@ -180,6 +192,9 @@ function check_matches() {
                 get_block(x, y + 2).classList.add("remove")
 
                 matches_flag = true
+
+                add_to_score_stack()
+
             }
 
         }
@@ -202,7 +217,7 @@ function remove_blocks() {
         }
     }
 
-    next_state()
+    setTimeout(() => {next_state()}, time_for_state[current_state] * 1000)
 }
 
 function sift_blocks() {
@@ -231,7 +246,7 @@ function sift_blocks() {
         }
     }
 
-    next_state()
+    setTimeout(() => {next_state()}, time_for_state[current_state] * 1000)
 }
 
 function add_blocks_top() {
@@ -252,7 +267,7 @@ function add_blocks_top() {
         }
     }
 
-    next_state()
+    setTimeout(() => {next_state()}, time_for_state[current_state] * 1000)
 
 }
 
@@ -274,29 +289,9 @@ function animate_block_fall() {
         }
     }   
     
-    setTimeout(() => {next_state()}, 1000)
+    setTimeout(() => {next_state()}, time_for_state[current_state] * 1000)
 }
 
-function iteration() {
-    check_matches()
-    remove_blocks()
-    sift_blocks()
-    add_blocks_top()
-    animate_block_fall()
-}
-
-function finish_iteration() {
-    remove_blocks()
-    sift_blocks()
-    add_blocks_top()
-    animate_block_fall()
-
-    setTimeout(() => {
-        if (check_matches())
-            finish_iteration()
-    }, 1000)
-    
-}
 
 state_transition = {
     idle : "remove_blocks",
@@ -304,6 +299,7 @@ state_transition = {
     sift_blocks : "add_blocks_top",
     add_blocks_top : "animate_block_fall",
     animate_block_fall: "idle",
+    swap: "remove_blocks"
 }
 
 state_name_to_function = {
@@ -312,15 +308,51 @@ state_name_to_function = {
     "sift_blocks" : sift_blocks,
     "add_blocks_top" : add_blocks_top,
     "animate_block_fall": animate_block_fall,
-    "idle" : () => {}
+    "idle" : () => {},
+    "swap" : () => { setTimeout(() => {next_state()}, time_for_state[current_state] * 1000);}
+}
+
+time_for_state = {
+    "check_matches" : 0,
+    "remove_blocks" : .1,
+    "sift_blocks" : 0,
+    "add_blocks_top" : 0,
+    "animate_block_fall": .5,
+    "idle" : 0,
+    "swap": .2
 }
 
 current_state = "idle"
 
 start_animation = true
 
+score_stack = []
+
+function add_to_score_stack() {
+    time = Date.now() / 1000
+
+    score_stack.unshift(time)
+}
+
+function get_score_in_last(sec) {
+    current_time = time = Date.now() / 1000
+
+    for (i = 0; i < score_stack.length; i ++) {
+        if (score_stack[i] < current_time - sec) {
+            return i + 1
+        }
+    }
+    return score_stack.length + 1
+
+}
+
+previous_knife = Date.now() / 1000
+
 // Animation
 setInterval(() => {
+
+    document.getElementById("score").innerText = score_stack.length
+
     if (start_animation) {
         start_time = Date.now() / 1000
         start_animation = false
@@ -328,68 +360,139 @@ setInterval(() => {
 
     time_elapsed = (Date.now() / 1000) - start_time
 
-    length_t = 1
+    length_t = time_for_state[current_state]
 
     t = time_elapsed / length_t
+
     if (t > 1)
         t = 1
     
-
     update_animation(t)
+
+    dt = (Date.now() / 1000) - previous_knife
+
+    knife_acceleration = levels[level_index]["acceleration"]
+
+    knife_velocity += knife_acceleration * dt
+
+    knife_position += knife_velocity * dt
+
+    if (knife_position > 1) 
+        knife_position = 1
+    if (knife_position < 0) {
+        knife_position = 0
+        knife_velocity = 0
+        knife_acceleration = 0
+    }
+
+    previous_knife = Date.now() / 1000
+
+
+    // console.log(knife_position, knife_velocity, knife_acceleration)
+
+    document.getElementById("bolt").style.top = `${10 * (1 - knife_position) + 60 * (knife_position)}%`
+
+    document.body.style.setProperty( "--background_color" , levels[level_index]["color"])
+
+    if (level_change[level_index] < score_stack.length) {
+        level_index += 1
+    }
     
 }, 10)
 
+
 function update_animation(t) {
+
     for (x = 0; x < width; x ++) {
                 
-            for (y = 0; y < height; y++) {
-
-                block = get_block(x, y)
-                if (block == undefined || block.getAttribute("animation") == undefined)
-                    continue
-
-                animation = block.getAttribute("animation")
-
-                block.style.transform = animation.replaceAll("tX", easeInSine(t))
-            }
-        }
-}
-
-
-function next_state() {
-
-    for (x = 0; x < width; x ++) {
-            
         for (y = 0; y < height; y++) {
 
             block = get_block(x, y)
+            if (block == undefined || block.getAttribute("animation") == undefined)
+                continue
 
-            if (block != undefined)
-                block.removeAttribute("animation")
+            animation = block.getAttribute("animation")
 
+            block.style.transform = animation.replaceAll("tX", easeInSine(t))
+        }
+    }
+}
+
+
+function next_state(next = undefined) {
+
+    if (next != undefined) {
+        console.log(`${current_state} -> ${next}`)
+
+        current_state = next
+        state_name_to_function[next]()
+
+    } else {
+
+        for (x = 0; x < width; x ++) {
+            
+            for (y = 0; y < height; y++) {
+
+                block = get_block(x, y)
+
+                if (block != undefined)
+                    block.removeAttribute("animation")
+
+            }
+        }
+        console.log(`${current_state} -> ${state_transition[current_state]}`)
+
+        current_state = state_transition[current_state]
+
+        if (current_state == "idle" && check_matches()) {
+            current_state = "remove_blocks"
+            state_name_to_function[current_state]()
+        } else if (current_state != "idle") {
+            state_name_to_function[current_state]()
         }
     }
 
-    console.log(current_state)
-    
+    start_animation = true
 
-    if (current_state == "idle" && check_matches()) {
-        console.log('WOW')
-        current_state = "remove_blocks"
-        state_name_to_function[current_state]()
-        start_animation = true
-    } else if (current_state != "idle") {
-        console.log("wow")
-        console.log(`${current_state} -> ${state_transition[current_state]}`)
-        current_state = state_transition[current_state]
-        state_name_to_function[current_state]()
-    }
 
     update_animation(0)
-
-    
 }
 
+// previous_update = Date.now() / 1000
+
+// function knife_update() {
+//     dt = Date.now() / 1000 - previous_update
+
+//     knife_acceleration = ((Math.log(score_stack.length) - get_score_in_last(3)) / 1000000) * dt
+
+//     knife_velocity += knife_acceleration * dt
+
+//     knife_position += knife_velocity
+
+//     if (knife_position > 1) 
+//         knife_position = 1
+//     if (knife_position < 0) {
+//         knife_position = 0
+//         knife_velocity = 0
+//         knife_acceleration = 0
+//     }
+
+// }
+
+
+
+
+function set_danger(val) {
+    if (val > 1) val = 1
+    if (val < 0) val = 0
+    danger = val
+}
+
+function get_danger() {
+    return danger
+}
+
+
 function easeInSine(x) {
-  return 1 - Math.cos((x * Math.PI) / 2);
+    return 1 - Math.cos((x * Math.PI) / 2);
 }
